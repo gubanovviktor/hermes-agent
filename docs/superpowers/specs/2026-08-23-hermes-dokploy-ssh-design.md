@@ -20,7 +20,7 @@ Create a small Dokploy-specific wrapper around the upstream Hermes source:
 - Add `openssh-server`.
 - Create or reuse a non-root `hermes` runtime user.
 - Store all Hermes state in a dedicated Docker volume mounted at `/opt/data`.
-- Publish a single external SSH port: `2222:22`.
+- Publish a single external SSH port: `2223:22`.
 - Run Hermes and `sshd` in the same container under a controlled entrypoint that preserves the upstream `/init` / s6 startup path.
 
 This gives direct SSH into the Hermes environment while keeping the deployment isolated from the Dokploy host and other projects.
@@ -44,12 +44,12 @@ SSH access will be key-only:
 - Root login disabled.
 - Public key injected through an environment variable or mounted authorized-keys file.
 - `sshd` listens on container port `22`.
-- Dokploy publishes host port `2222`.
+- Dokploy publishes host port `2223`.
 
 Expected connection shape:
 
 ```bash
-ssh -p 2222 hermes@<dokploy-host-or-domain>
+ssh -p 2223 hermes@<dokploy-host-or-domain>
 ```
 
 Inside the SSH session, the user lands in the Hermes environment and can run:
@@ -106,7 +106,7 @@ The SSH private key stays only on the client machine.
 
 Initial exposure:
 
-- Publish SSH only: host port `2222` to container port `22`.
+- Publish SSH only: host port `2223` to container port `22`.
 
 Do not expose initially:
 
@@ -119,7 +119,7 @@ Do not expose initially:
 If dashboard access is needed, use:
 
 ```bash
-ssh -p 2222 -L 9119:127.0.0.1:9119 hermes@<host>
+ssh -p 2223 -L 9119:127.0.0.1:9119 hermes@<host>
 ```
 
 Then open `http://127.0.0.1:9119` locally, assuming the dashboard is running inside the container on localhost.
@@ -172,4 +172,4 @@ Minimum verification before calling the deployment done:
 
 ## Port Rule
 
-Use SSH host port `2222` by default. During implementation, verify it is free on the Dokploy host before deploying. If it is occupied, stop and pick the nearest clear high port instead of replacing another service.
+Use SSH host port `2223`. Port `2222` was occupied on the Dokploy host during implementation, so the deployment moved to the nearest clear candidate instead of replacing another service.

@@ -6,7 +6,7 @@ services:
     image: hermes-agent-dokploy-ssh:latest
     restart: unless-stopped
     ports:
-      - "${HERMES_SSH_HOST_PORT:-2222}:22"
+      - "${HERMES_SSH_HOST_PORT:-2223}:22"
     volumes:
       - hermes-data:/opt/data
     environment:

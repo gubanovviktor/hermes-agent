@@ -4,7 +4,7 @@
 
 **Goal:** Deploy Hermes Agent as an isolated Dokploy Docker Compose service with persistent state and key-only direct SSH into the container.
 
-**Architecture:** Clone the upstream Hermes source into this workspace, then add the smallest Dokploy-specific runtime layer directly to that source tree: `openssh-server`, an s6-supervised SSH service, a cont-init script that installs the authorized key from an environment variable, and a Compose file that publishes only SSH port `2222`. The deployment keeps upstream Hermes `/init` and s6 behavior intact, mounts a named `/opt/data` volume, and avoids host networking.
+**Architecture:** Clone the upstream Hermes source into this workspace, then add the smallest Dokploy-specific runtime layer directly to that source tree: `openssh-server`, an s6-supervised SSH service, a cont-init script that installs the authorized key from an environment variable, and a Compose file that publishes only SSH port `2223`. The deployment keeps upstream Hermes `/init` and s6 behavior intact, mounts a named `/opt/data` volume, and avoids host networking.
 
 **Tech Stack:** Dokploy Docker Compose, Docker, Debian 13-based Hermes image, s6-overlay, OpenSSH server, shell scripts.
 
@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - The service must not use `network_mode: host`.
-- Only host port `2222` to container port `22` is published initially.
+- Only host port `2223` to container port `22` is published initially.
 - SSH is key-only: password login disabled and root login disabled.
 - Hermes state persists in a named Docker volume mounted at `/opt/data`.
 - No Docker socket is mounted into the Hermes container.
@@ -21,7 +21,7 @@
 - No public Hermes dashboard or public Hermes API server is exposed in the initial deployment.
 - No API keys or private SSH keys are baked into the image.
 - Preserve upstream Hermes entrypoint behavior: `/opt/hermes/docker/entrypoint-dispatch.sh` remains the image `ENTRYPOINT`.
-- If host port `2222` is occupied on Dokploy, stop and choose the nearest clear high port instead of replacing another service.
+- Host port `2222` was occupied on Dokploy, so use host port `2223` instead.
 
 ---
 
@@ -326,7 +326,7 @@ services:
     image: hermes-agent-dokploy-ssh:latest
     restart: unless-stopped
     ports:
-      - "${HERMES_SSH_HOST_PORT:-2222}:22"
+      - "${HERMES_SSH_HOST_PORT:-2223}:22"
     volumes:
       - hermes-data:/opt/data
     environment:
@@ -346,7 +346,7 @@ Expected: no `network_mode: host` appears in the file.
 Create `.env.dokploy.example` with exactly:
 
 ```dotenv
-HERMES_SSH_HOST_PORT=2222
+HERMES_SSH_HOST_PORT=2223
 HERMES_UID=10000
 HERMES_GID=10000
 HERMES_SSH_AUTHORIZED_KEY=ssh-ed25519 AAAA_REPLACE_WITH_YOUR_PUBLIC_KEY victor@example
@@ -360,7 +360,7 @@ Run:
 HERMES_SSH_AUTHORIZED_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFakeKeyForComposeValidationOnly user@example" docker compose config >/tmp/hermes-compose-config.yml
 ```
 
-Expected: command exits 0 and `/tmp/hermes-compose-config.yml` contains `2222:22` or the equivalent expanded port mapping.
+Expected: command exits 0 and `/tmp/hermes-compose-config.yml` contains `2223:22` or the equivalent expanded port mapping.
 
 - [ ] **Step 4: Commit Compose files**
 
@@ -397,7 +397,7 @@ This deployment runs Hermes Agent as one isolated Docker Compose service on Dokp
 
 - Deployment type: Docker Compose
 - Compose file: `docker-compose.yml`
-- Published TCP port: `${HERMES_SSH_HOST_PORT:-2222}` to container port `22`
+- Published TCP port: `${HERMES_SSH_HOST_PORT:-2223}` to container port `22`
 - Persistent volume: `hermes-data:/opt/data`
 
 ## Required Environment
@@ -405,7 +405,7 @@ This deployment runs Hermes Agent as one isolated Docker Compose service on Dokp
 Set these in Dokploy:
 
 ```dotenv
-HERMES_SSH_HOST_PORT=2222
+HERMES_SSH_HOST_PORT=2223
 HERMES_UID=10000
 HERMES_GID=10000
 HERMES_SSH_AUTHORIZED_KEY=<your public SSH key>
@@ -416,7 +416,7 @@ Use a public key, not a private key. A valid value starts with `ssh-ed25519`, `s
 ## SSH
 
 ```bash
-ssh -p 2222 hermes@<dokploy-host-or-domain>
+ssh -p 2223 hermes@<dokploy-host-or-domain>
 ```
 
 Inside the container:
@@ -432,7 +432,7 @@ hermes
 The dashboard is not exposed publicly. If you enable it later inside the container, access it with a tunnel:
 
 ```bash
-ssh -p 2222 -L 9119:127.0.0.1:9119 hermes@<dokploy-host-or-domain>
+ssh -p 2223 -L 9119:127.0.0.1:9119 hermes@<dokploy-host-or-domain>
 ```
 
 Then open `http://127.0.0.1:9119` on your local machine.
@@ -442,8 +442,8 @@ Then open `http://127.0.0.1:9119` on your local machine.
 After deployment:
 
 ```bash
-ssh -p 2222 hermes@<dokploy-host-or-domain> 'whoami && hermes doctor'
-ssh -p 2222 root@<dokploy-host-or-domain>
+ssh -p 2223 hermes@<dokploy-host-or-domain> 'whoami && hermes doctor'
+ssh -p 2223 root@<dokploy-host-or-domain>
 ```
 
 The first command should log in as `hermes`. The second command should fail because root login is disabled.
@@ -511,7 +511,7 @@ Expected: build exits 0.
 Run:
 
 ```bash
-HERMES_SSH_HOST_PORT=2222 HERMES_SSH_AUTHORIZED_KEY="$(cat /tmp/hermes_dokploy_test_key.pub)" docker compose up -d hermes
+HERMES_SSH_HOST_PORT=2223 HERMES_SSH_AUTHORIZED_KEY="$(cat /tmp/hermes_dokploy_test_key.pub)" docker compose up -d hermes
 ```
 
 Expected: `docker compose ps hermes` shows the service running.
@@ -525,14 +525,14 @@ docker compose port hermes 22
 docker inspect "$(docker compose ps -q hermes)" --format '{{json .HostConfig.NetworkMode}} {{json .HostConfig.Binds}}'
 ```
 
-Expected: first command prints a host binding for port `2222`; second command does not print `host` as the network mode and does not list host filesystem binds.
+Expected: first command prints a host binding for port `2223`; second command does not print `host` as the network mode and does not list host filesystem binds.
 
 - [ ] **Step 6: Verify SSH login works**
 
 Run:
 
 ```bash
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/tmp/hermes_known_hosts -i /tmp/hermes_dokploy_test_key -p 2222 hermes@127.0.0.1 'whoami && test "$HOME" = "/opt/data" && hermes doctor || true'
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/tmp/hermes_known_hosts -i /tmp/hermes_dokploy_test_key -p 2223 hermes@127.0.0.1 'whoami && test "$HOME" = "/opt/data" && hermes doctor || true'
 ```
 
 Expected: output starts with `hermes`. `hermes doctor` may report configuration warnings before setup, but the binary must execute.
@@ -542,7 +542,7 @@ Expected: output starts with `hermes`. `hermes doctor` may report configuration 
 Run:
 
 ```bash
-ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/tmp/hermes_known_hosts -i /tmp/hermes_dokploy_test_key -p 2222 root@127.0.0.1 'true'
+ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/tmp/hermes_known_hosts -i /tmp/hermes_dokploy_test_key -p 2223 root@127.0.0.1 'true'
 ```
 
 Expected: command fails.
@@ -552,7 +552,7 @@ Expected: command fails.
 Run:
 
 ```bash
-ssh -o BatchMode=yes -o PubkeyAuthentication=no -o PreferredAuthentications=password -p 2222 hermes@127.0.0.1 'true'
+ssh -o BatchMode=yes -o PubkeyAuthentication=no -o PreferredAuthentications=password -p 2223 hermes@127.0.0.1 'true'
 ```
 
 Expected: command fails without prompting for a password.
@@ -562,10 +562,10 @@ Expected: command fails without prompting for a password.
 Run:
 
 ```bash
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/tmp/hermes_known_hosts -i /tmp/hermes_dokploy_test_key -p 2222 hermes@127.0.0.1 'printf persistent > /opt/data/persist-check.txt'
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/tmp/hermes_known_hosts -i /tmp/hermes_dokploy_test_key -p 2223 hermes@127.0.0.1 'printf persistent > /opt/data/persist-check.txt'
 docker compose restart hermes
 sleep 10
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/tmp/hermes_known_hosts -i /tmp/hermes_dokploy_test_key -p 2222 hermes@127.0.0.1 'cat /opt/data/persist-check.txt'
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/tmp/hermes_known_hosts -i /tmp/hermes_dokploy_test_key -p 2223 hermes@127.0.0.1 'cat /opt/data/persist-check.txt'
 ```
 
 Expected: final output is `persistent`.
@@ -603,12 +603,12 @@ Expected: commit is created only if files changed.
 - Consumes: verified repository from Task 6 and Dokploy credentials available through the existing local Dokploy helper or Dokploy UI.
 - Produces: running Dokploy service accessible by direct SSH.
 
-- [ ] **Step 1: Check whether host port 2222 is free on the Dokploy host**
+- [ ] **Step 1: Check whether host port 2223 is free on the Dokploy host**
 
 Use the Dokploy host shell or Dokploy helper to run:
 
 ```bash
-ss -tlnp | awk '$4 ~ /:2222$/ { print }'
+ss -tlnp | awk '$4 ~ /:2223$/ { print }'
 ```
 
 Expected: no output. If there is output, choose the nearest clear high port, update `HERMES_SSH_HOST_PORT`, `docs/deploy/dokploy-ssh.md`, and the spec port note before deploying.
@@ -628,7 +628,7 @@ Expected: Dokploy project exists and points at this repository/branch or uploade
 Set:
 
 ```dotenv
-HERMES_SSH_HOST_PORT=2222
+HERMES_SSH_HOST_PORT=2223
 HERMES_UID=10000
 HERMES_GID=10000
 HERMES_SSH_AUTHORIZED_KEY=<the user's public SSH key>
@@ -658,7 +658,7 @@ Expected: SSH port is published; network mode is not `host`; no Docker socket or
 From the local machine:
 
 ```bash
-ssh -p 2222 hermes@<dokploy-host-or-domain> 'whoami && hermes doctor || true'
+ssh -p 2223 hermes@<dokploy-host-or-domain> 'whoami && hermes doctor || true'
 ```
 
 Expected: output starts with `hermes`; `hermes doctor` executes.
@@ -668,7 +668,7 @@ Expected: output starts with `hermes`; `hermes doctor` executes.
 From the local machine:
 
 ```bash
-ssh -o BatchMode=yes -p 2222 root@<dokploy-host-or-domain> 'true'
+ssh -o BatchMode=yes -p 2223 root@<dokploy-host-or-domain> 'true'
 ```
 
 Expected: command fails.
@@ -678,7 +678,7 @@ Expected: command fails.
 From the local machine:
 
 ```bash
-ssh -p 2222 hermes@<dokploy-host-or-domain>
+ssh -p 2223 hermes@<dokploy-host-or-domain>
 ```
 
 Inside the SSH session, run one of:
@@ -706,14 +706,14 @@ printf dokploy-persistent > /opt/data/dokploy-persist-check.txt
 Restart the service in Dokploy, then run:
 
 ```bash
-ssh -p 2222 hermes@<dokploy-host-or-domain> 'cat /opt/data/dokploy-persist-check.txt'
+ssh -p 2223 hermes@<dokploy-host-or-domain> 'cat /opt/data/dokploy-persist-check.txt'
 ```
 
 Expected: output is `dokploy-persistent`.
 
 - [ ] **Step 10: Record final access details**
 
-Update `docs/deploy/dokploy-ssh.md` if the deployed SSH port is not `2222`.
+Update `docs/deploy/dokploy-ssh.md` if the deployed SSH port is not `2223`.
 
 Run:
 
