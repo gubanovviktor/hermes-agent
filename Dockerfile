@@ -301,8 +301,8 @@ RUN mkdir -p /opt/hermes/bin && \
     chmod 0755 /opt/hermes/bin/hermes && \
     printf '%s\n' \
         '#!/bin/sh' \
-        'export HERMES_HOME="${HERMES_HOME:-/opt/data}"' \
-        'export HOME="${HOME:-/opt/data}"' \
+        'export HERMES_HOME=/opt/data' \
+        'export HOME=/opt/data' \
         'exec /opt/hermes/bin/hermes "$@"' \
         > /usr/local/bin/hermes && \
     chmod 755 /usr/local/bin/hermes && \
