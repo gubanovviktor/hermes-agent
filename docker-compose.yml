@@ -148,6 +148,19 @@ services:
       timeout: 5s
       retries: 12
 
+  openconcho:
+    image: ghcr.io/offendingcommit/openconcho-web:latest
+    pull_policy: always
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${OPENCONCHO_HOST_PORT:-8080}:8080"
+    environment:
+      OPENCONCHO_DEFAULT_HONCHO_URL: "http://honcho-api:8000"
+      OPENCONCHO_UPSTREAM_ALLOWLIST: "honcho-api"
+    depends_on:
+      honcho-api:
+        condition: service_healthy
+
 volumes:
   hermes-data:
   honcho-postgres-data:
