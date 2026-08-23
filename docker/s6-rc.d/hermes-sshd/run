@@ -1,0 +1,11 @@
+#!/command/with-contenv sh
+set -eu
+
+mkdir -p /run/sshd
+chmod 0755 /run/sshd
+
+if [ ! -f /etc/ssh/ssh_host_ed25519_key ]; then
+    ssh-keygen -A
+fi
+
+exec /usr/sbin/sshd -D -e -f /etc/ssh/sshd_config

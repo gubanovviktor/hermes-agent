@@ -1,0 +1,22 @@
+Port 22
+Protocol 2
+HostKey /etc/ssh/ssh_host_ed25519_key
+HostKey /etc/ssh/ssh_host_rsa_key
+PidFile /run/sshd.pid
+AuthorizedKeysFile .ssh/authorized_keys
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+ChallengeResponseAuthentication no
+PermitRootLogin no
+PubkeyAuthentication yes
+PermitEmptyPasswords no
+X11Forwarding no
+AllowTcpForwarding yes
+AllowAgentForwarding no
+PermitTunnel no
+UsePAM no
+PrintMotd no
+ClientAliveInterval 60
+ClientAliveCountMax 3
+AllowUsers hermes
+Subsystem sftp internal-sftp
