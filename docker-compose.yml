@@ -18,7 +18,7 @@ services:
     depends_on:
       honcho-api:
         condition: service_healthy
-    command: ["sleep", "infinity"]
+    command: ["sh", "-lc", "hermes config set memory.provider honcho >/dev/null 2>&1 || true; sleep infinity"]
 
   honcho-api:
     build:
