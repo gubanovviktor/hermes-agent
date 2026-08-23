@@ -15,6 +15,7 @@ case "${HERMES_SSH_AUTHORIZED_KEY}" in
         ;;
 esac
 
+passwd -d hermes >/dev/null
 install -d -m 0700 -o hermes -g hermes /opt/data/.ssh
 printf '%s\n' "${HERMES_SSH_AUTHORIZED_KEY}" > /opt/data/.ssh/authorized_keys
 chown hermes:hermes /opt/data/.ssh/authorized_keys
