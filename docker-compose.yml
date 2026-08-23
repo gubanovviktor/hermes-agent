@@ -13,7 +13,143 @@ services:
       HERMES_UID: "${HERMES_UID:-10000}"
       HERMES_GID: "${HERMES_GID:-10000}"
       HERMES_SSH_AUTHORIZED_KEY: "${HERMES_SSH_AUTHORIZED_KEY}"
+      HONCHO_BASE_URL: "http://honcho-api:8000"
+      HONCHO_API_KEY: "${HONCHO_WORKSPACE_TOKEN}"
+    depends_on:
+      honcho-api:
+        condition: service_healthy
     command: ["sleep", "infinity"]
+
+  honcho-api:
+    build:
+      context: https://github.com/plastic-labs/honcho.git#main
+      dockerfile: Dockerfile
+      args:
+        INSTALL_LANCEDB: "${INSTALL_LANCEDB:-false}"
+    entrypoint: ["sh", "docker/entrypoint.sh"]
+    restart: unless-stopped
+    depends_on:
+      honcho-postgres:
+        condition: service_healthy
+      honcho-redis:
+        condition: service_healthy
+    environment:
+      DB_CONNECTION_URI: "postgresql+psycopg://postgres:${HONCHO_DB_PASSWORD}@honcho-postgres:5432/postgres"
+      CACHE_URL: "redis://honcho-redis:6379/0?suppress=true"
+      CACHE_ENABLED: "true"
+      AUTH_USE_AUTH: "true"
+      AUTH_JWT_SECRET: "${HONCHO_AUTH_JWT_SECRET}"
+      LLM_OPENAI_API_KEY: "${OPENROUTER_API_KEY}"
+      EMBEDDING_MODEL_CONFIG__MODEL: "openai/text-embedding-3-small"
+      EMBEDDING_MODEL_CONFIG__OVERRIDES__BASE_URL: "https://openrouter.ai/api/v1"
+      DERIVER_MODEL_CONFIG__MODEL: "openai/gpt-5.6-luna"
+      DERIVER_MODEL_CONFIG__OVERRIDES__BASE_URL: "https://openrouter.ai/api/v1"
+      SUMMARY_MODEL_CONFIG__MODEL: "openai/gpt-5.6-luna"
+      SUMMARY_MODEL_CONFIG__OVERRIDES__BASE_URL: "https://openrouter.ai/api/v1"
+      DREAM_DEDUCTION_MODEL_CONFIG__MODEL: "openai/gpt-5.6-luna"
+      DREAM_DEDUCTION_MODEL_CONFIG__OVERRIDES__BASE_URL: "https://openrouter.ai/api/v1"
+      DREAM_INDUCTION_MODEL_CONFIG__MODEL: "openai/gpt-5.6-luna"
+      DREAM_INDUCTION_MODEL_CONFIG__OVERRIDES__BASE_URL: "https://openrouter.ai/api/v1"
+      DIALECTIC_LEVELS__minimal__MODEL_CONFIG__MODEL: "openai/gpt-5.6-luna"
+      DIALECTIC_LEVELS__minimal__MODEL_CONFIG__OVERRIDES__BASE_URL: "https://openrouter.ai/api/v1"
+      DIALECTIC_LEVELS__low__MODEL_CONFIG__MODEL: "openai/gpt-5.6-luna"
+      DIALECTIC_LEVELS__low__MODEL_CONFIG__OVERRIDES__BASE_URL: "https://openrouter.ai/api/v1"
+      DIALECTIC_LEVELS__medium__MODEL_CONFIG__MODEL: "openai/gpt-5.6-luna"
+      DIALECTIC_LEVELS__medium__MODEL_CONFIG__OVERRIDES__BASE_URL: "https://openrouter.ai/api/v1"
+      DIALECTIC_LEVELS__high__MODEL_CONFIG__MODEL: "openai/gpt-5.6-luna"
+      DIALECTIC_LEVELS__high__MODEL_CONFIG__OVERRIDES__BASE_URL: "https://openrouter.ai/api/v1"
+      DIALECTIC_LEVELS__max__MODEL_CONFIG__MODEL: "openai/gpt-5.6-luna"
+      DIALECTIC_LEVELS__max__MODEL_CONFIG__OVERRIDES__BASE_URL: "https://openrouter.ai/api/v1"
+      LOG_LEVEL: "INFO"
+      METRICS_ENABLED: "false"
+      TELEMETRY_ENABLED: "false"
+    healthcheck:
+      test: ["CMD", "/app/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    volumes:
+      - honcho-lancedb-data:/app/lancedb_data
+
+  honcho-deriver:
+    build:
+      context: https://github.com/plastic-labs/honcho.git#main
+      dockerfile: Dockerfile
+      args:
+        INSTALL_LANCEDB: "${INSTALL_LANCEDB:-false}"
+    entrypoint: ["/app/.venv/bin/python", "-m", "src.deriver"]
+    restart: unless-stopped
+    depends_on:
+      honcho-api:
+        condition: service_healthy
+      honcho-postgres:
+        condition: service_healthy
+      honcho-redis:
+        condition: service_healthy
+    environment:
+      DB_CONNECTION_URI: "postgresql+psycopg://postgres:${HONCHO_DB_PASSWORD}@honcho-postgres:5432/postgres"
+      CACHE_URL: "redis://honcho-redis:6379/0?suppress=true"
+      CACHE_ENABLED: "true"
+      AUTH_USE_AUTH: "true"
+      AUTH_JWT_SECRET: "${HONCHO_AUTH_JWT_SECRET}"
+      LLM_OPENAI_API_KEY: "${OPENROUTER_API_KEY}"
+      EMBEDDING_MODEL_CONFIG__MODEL: "openai/text-embedding-3-small"
+      EMBEDDING_MODEL_CONFIG__OVERRIDES__BASE_URL: "https://openrouter.ai/api/v1"
+      DERIVER_MODEL_CONFIG__MODEL: "openai/gpt-5.6-luna"
+      DERIVER_MODEL_CONFIG__OVERRIDES__BASE_URL: "https://openrouter.ai/api/v1"
+      SUMMARY_MODEL_CONFIG__MODEL: "openai/gpt-5.6-luna"
+      SUMMARY_MODEL_CONFIG__OVERRIDES__BASE_URL: "https://openrouter.ai/api/v1"
+      DREAM_DEDUCTION_MODEL_CONFIG__MODEL: "openai/gpt-5.6-luna"
+      DREAM_DEDUCTION_MODEL_CONFIG__OVERRIDES__BASE_URL: "https://openrouter.ai/api/v1"
+      DREAM_INDUCTION_MODEL_CONFIG__MODEL: "openai/gpt-5.6-luna"
+      DREAM_INDUCTION_MODEL_CONFIG__OVERRIDES__BASE_URL: "https://openrouter.ai/api/v1"
+      DIALECTIC_LEVELS__minimal__MODEL_CONFIG__MODEL: "openai/gpt-5.6-luna"
+      DIALECTIC_LEVELS__minimal__MODEL_CONFIG__OVERRIDES__BASE_URL: "https://openrouter.ai/api/v1"
+      DIALECTIC_LEVELS__low__MODEL_CONFIG__MODEL: "openai/gpt-5.6-luna"
+      DIALECTIC_LEVELS__low__MODEL_CONFIG__OVERRIDES__BASE_URL: "https://openrouter.ai/api/v1"
+      DIALECTIC_LEVELS__medium__MODEL_CONFIG__MODEL: "openai/gpt-5.6-luna"
+      DIALECTIC_LEVELS__medium__MODEL_CONFIG__OVERRIDES__BASE_URL: "https://openrouter.ai/api/v1"
+      DIALECTIC_LEVELS__high__MODEL_CONFIG__MODEL: "openai/gpt-5.6-luna"
+      DIALECTIC_LEVELS__high__MODEL_CONFIG__OVERRIDES__BASE_URL: "https://openrouter.ai/api/v1"
+      DIALECTIC_LEVELS__max__MODEL_CONFIG__MODEL: "openai/gpt-5.6-luna"
+      DIALECTIC_LEVELS__max__MODEL_CONFIG__OVERRIDES__BASE_URL: "https://openrouter.ai/api/v1"
+      LOG_LEVEL: "INFO"
+      METRICS_ENABLED: "false"
+      TELEMETRY_ENABLED: "false"
+    volumes:
+      - honcho-lancedb-data:/app/lancedb_data
+
+  honcho-postgres:
+    image: pgvector/pgvector:pg15
+    restart: unless-stopped
+    command: ["postgres", "-c", "max_connections=200"]
+    environment:
+      POSTGRES_DB: "postgres"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "${HONCHO_DB_PASSWORD}"
+      PGDATA: "/var/lib/postgresql/data/pgdata"
+    volumes:
+      - honcho-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  honcho-redis:
+    image: redis:8.2
+    restart: unless-stopped
+    volumes:
+      - honcho-redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
 volumes:
   hermes-data:
+  honcho-postgres-data:
+  honcho-redis-data:
+  honcho-lancedb-data:
