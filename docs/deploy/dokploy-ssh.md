@@ -119,8 +119,12 @@ bakes what's needed at build time:
   - `hermes config set browser.record_sessions true` — auto-record each browser
     session to a WebM under `/opt/data/browser_recordings/` (72 h retention).
 
-`docker/stage2-hook.sh` discovers the Chromium binary under
-`$PLAYWRIGHT_BROWSERS_PATH` at boot and exports `AGENT_BROWSER_EXECUTABLE_PATH`.
+`docker/stage2-hook.sh` at boot: discovers the Chromium binary under
+`$PLAYWRIGHT_BROWSERS_PATH` (preferring the full `chrome` build over the headless
+shell) and exports `AGENT_BROWSER_EXECUTABLE_PATH`; and sets `XDG_RUNTIME_DIR` to
+`/opt/data/.xdg-runtime` — without it agent-browser 0.26 aborts with "Failed to
+create socket directory" (it falls back to `/run/user/<uid>`, which the non-root
+`hermes` user cannot create).
 
 Screenshots (`browser_vision`, `screenshot`) and WebM session recording both work
 headless — no display needed. `computer_use` (full desktop control / desktop screen

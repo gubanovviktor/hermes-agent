@@ -675,11 +675,19 @@ fi
 if [ -z "${AGENT_BROWSER_EXECUTABLE_PATH:-}" ] && \
         [ -n "${PLAYWRIGHT_BROWSERS_PATH:-}" ] && \
         [ -d "$PLAYWRIGHT_BROWSERS_PATH" ]; then
+    # Prefer a full Chromium ('chrome' / 'chromium', typically under
+    # chromium-<build>/) over the headless shell — the full build handles
+    # logins / anti-bot better and can run headed. Fall back to the shell
+    # (or chromium-browser) only when no full build is present.
     browser_bin=$(find "$PLAYWRIGHT_BROWSERS_PATH" -type f -executable \
-        \( -name 'chrome' -o -name 'chromium' \
-           -o -name 'chrome-headless-shell' -o -name 'headless_shell' \
-           -o -name 'chromium-browser' \) \
+        \( -name 'chrome' -o -name 'chromium' \) \
         2>/dev/null | head -n 1)
+    if [ -z "$browser_bin" ]; then
+        browser_bin=$(find "$PLAYWRIGHT_BROWSERS_PATH" -type f -executable \
+            \( -name 'chrome-headless-shell' -o -name 'headless_shell' \
+               -o -name 'chromium-browser' \) \
+            2>/dev/null | head -n 1)
+    fi
     if [ -n "$browser_bin" ]; then
         echo "[stage2] Found agent-browser Chromium binary: $browser_bin"
         # Write to s6's container_environment so with-contenv picks it
@@ -692,6 +700,22 @@ if [ -z "${AGENT_BROWSER_EXECUTABLE_PATH:-}" ] && \
     else
         echo "[stage2] Warning: no Chromium binary under $PLAYWRIGHT_BROWSERS_PATH; browser tool may fail"
     fi
+fi
+
+# --- Ensure XDG_RUNTIME_DIR for agent-browser ---
+# agent-browser (0.26+) puts its control socket under $XDG_RUNTIME_DIR and
+# aborts with "Failed to create socket directory: Permission denied" when the
+# var is unset — it then tries /run/user/<uid>, which doesn't exist and which
+# the non-root hermes user can't create. Point it at a writable, persistent
+# dir on the data volume so every supervised service (gateway, etc.) inherits
+# it via with-contenv. Skipped when the operator already set one.
+if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
+    xdg_dir="$HERMES_HOME/.xdg-runtime"
+    mkdir -p "$xdg_dir" && chmod 700 "$xdg_dir"
+    chown hermes:hermes "$xdg_dir" 2>/dev/null || true
+    mkdir -p /run/s6/container_environment
+    printf '%s' "$xdg_dir" > /run/s6/container_environment/XDG_RUNTIME_DIR
+    echo "[stage2] XDG_RUNTIME_DIR set to $xdg_dir"
 fi
 
 echo "[stage2] Setup complete; starting user services"
