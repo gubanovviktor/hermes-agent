@@ -1,0 +1,64 @@
+name: Deploy dokploy-ssh
+
+# Dokploy's "redeploy" rebuilds the already-checked-out tree and does NOT pull
+# git, so pushed commits can be silently ignored. This workflow calls
+# compose.deploy (fresh fetch + build) on every push to the deployment branch,
+# so `git push` always lands. Runs from GitHub's runners, which can send the
+# Cloudflare Access service-token headers that GitHub's own webhooks cannot.
+
+on:
+  push:
+    branches: [dokploy-ssh-container]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-dokploy-ssh
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Dokploy compose.deploy
+        env:
+          COMPOSE_ID: XwQ9vg7o5hRuYwNegVLQh
+          DOKPLOY_API_TOKEN: ${{ secrets.DOKPLOY_API_TOKEN }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.DOKPLOY_CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.DOKPLOY_CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o /tmp/resp.json -w '%{http_code}' -X POST \
+            -H "x-api-key: ${DOKPLOY_API_TOKEN}" \
+            -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" \
+            -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}" \
+            -H "Content-Type: application/json" \
+            --data "{\"composeId\":\"${COMPOSE_ID}\"}" \
+            "https://351hub.space/api/compose.deploy")
+          echo "HTTP ${code}"
+          cat /tmp/resp.json || true
+          echo
+          test "${code}" = "200"
+
+      - name: Wait for build to finish
+        env:
+          COMPOSE_ID: XwQ9vg7o5hRuYwNegVLQh
+          DOKPLOY_API_TOKEN: ${{ secrets.DOKPLOY_API_TOKEN }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.DOKPLOY_CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.DOKPLOY_CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          url="https://351hub.space/api/compose.one?composeId=${COMPOSE_ID}"
+          for i in $(seq 1 60); do
+            sleep 20
+            status=$(curl -sS \
+              -H "x-api-key: ${DOKPLOY_API_TOKEN}" \
+              -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" \
+              -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}" \
+              "$url" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("composeStatus",""))')
+            echo "[$i] composeStatus=${status}"
+            case "$status" in
+              done) echo "deploy ok"; exit 0 ;;
+              error) echo "deploy failed"; exit 1 ;;
+            esac
+          done
+          echo "timed out waiting for deploy"; exit 1

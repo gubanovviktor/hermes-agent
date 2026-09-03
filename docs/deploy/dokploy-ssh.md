@@ -9,6 +9,20 @@ This deployment runs Hermes Agent as one isolated Docker Compose service on Dokp
 - Published TCP port: `${HERMES_SSH_HOST_PORT:-2223}` to container port `22`
 - Persistent volume: `hermes-data:/opt/data`
 
+## Deploying
+
+`git push` to `dokploy-ssh-container` is enough — `.github/workflows/deploy-dokploy-ssh.yml`
+calls the Dokploy **`compose.deploy`** API (fresh git fetch + build) and waits for it.
+
+Do **not** use Dokploy's "Redeploy" button / `compose.redeploy` for code changes: it
+rebuilds the tree Dokploy already has checked out and does not pull, so pushed commits
+are silently ignored. `compose.deploy` (the "Deploy" button, or the workflow) fetches
+first. The GitHub workflow runs from GitHub's runners so it can send the Cloudflare
+Access service-token headers that a plain GitHub webhook cannot.
+
+Repo secrets used by the workflow: `DOKPLOY_API_TOKEN`, `DOKPLOY_CF_ACCESS_CLIENT_ID`,
+`DOKPLOY_CF_ACCESS_CLIENT_SECRET`.
+
 ## Required Environment
 
 Set these in Dokploy:
