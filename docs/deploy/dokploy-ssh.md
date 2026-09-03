@@ -36,15 +36,72 @@ hermes setup
 hermes
 ```
 
-## Dashboard Tunnel
+## Dashboard
 
-The dashboard is not exposed publicly. If you enable it later inside the container, access it with a tunnel:
+The web dashboard (config editor, API-key manager, session browser) is **not exposed
+publicly** by this deployment — only SSH is. Reach it through an SSH tunnel.
 
-```bash
-ssh -p 2223 -L 9119:127.0.0.1:9119 hermes@<dokploy-host-or-domain>
+### Why the supervised service stays down
+
+The image ships an s6 `dashboard` service, but in this Dokploy deployment it does not
+start on its own:
+
+1. Dokploy's env-panel variables are only used for `${...}` interpolation in
+   `docker-compose.yml`. `HERMES_DASHBOARD*` are not referenced in the compose
+   `environment:` block, so they never reach the container and the service's `run`
+   script exits early (`s6-svstat /run/service/dashboard` shows `down`).
+2. Even when the flag is passed, the `run` script calls `hermes dashboard` without
+   `--skip-build`, and the sealed image cannot `npm install` at runtime. The SPA
+   bundle is already prebuilt at `/opt/hermes/hermes_cli/web_dist/`, so `--skip-build`
+   is required.
+
+### Working access — SSH config alias (recommended)
+
+Add to your local `~/.ssh/config`:
+
+```sshconfig
+Host hermes-dash
+  HostName <dokploy-host>
+  Port 2223
+  User hermes
+  IdentityFile ~/.ssh/id_ed25519
+  IdentitiesOnly yes
+  LocalForward 9119 127.0.0.1:9119
+  RemoteCommand hermes dashboard --host 127.0.0.1 --port 9119 --no-open --skip-build
 ```
 
-Then open `http://127.0.0.1:9119` on your local machine.
+Then:
+
+```bash
+ssh hermes-dash
+```
+
+Wait ~10 s for the `HERMES_DASHBOARD_READY port=9119` line, then open
+<http://localhost:9119>. `Ctrl-C` stops the dashboard and closes the tunnel.
+
+### One-off equivalent
+
+```bash
+ssh -p 2223 -i ~/.ssh/id_ed25519 -L 9119:127.0.0.1:9119 hermes@<dokploy-host> \
+  "hermes dashboard --host 127.0.0.1 --port 9119 --no-open --skip-build"
+```
+
+### Making it a real supervised service
+
+To have s6 keep the dashboard up across restarts, two source changes are needed on the
+deployment branch:
+
+- `docker-compose.yml` → add to `environment:`:
+  ```yaml
+  HERMES_DASHBOARD: "${HERMES_DASHBOARD:-1}"
+  HERMES_DASHBOARD_HOST: "${HERMES_DASHBOARD_HOST:-127.0.0.1}"
+  HERMES_DASHBOARD_PORT: "${HERMES_DASHBOARD_PORT:-9119}"
+  ```
+- `docker/s6-rc.d/dashboard/run` → append `--skip-build` to the final
+  `exec … hermes dashboard …` line.
+
+Keep `HERMES_DASHBOARD_HOST=127.0.0.1` so the bind stays loopback-only (the non-loopback
+auth gate never engages); the SSH tunnel remains the security boundary.
 
 ## Security Checks
 
