@@ -112,21 +112,26 @@ bakes what's needed at build time:
 
 - `Dockerfile` — full `npx playwright install --with-deps chromium` (no `--only-shell`)
   plus `npm install -g agent-browser@^0.26.0` so the CLI resolves offline.
-- `docker-compose.yml` `command:` — `hermes config set browser.backend off` on every
-  start, so Hermes drives the baked Chromium through the built-in `browser_*` tools
-  instead of the Browser Use CLI (which would try to fetch itself at runtime).
+- `docker-compose.yml` `command:` — on every start:
+  - `hermes config set browser.backend off` — drive the baked Chromium through the
+    built-in `browser_*` tools instead of the Browser Use CLI (which would try to
+    fetch itself at runtime).
+  - `hermes config set browser.record_sessions true` — auto-record each browser
+    session to a WebM under `/opt/data/browser_recordings/` (72 h retention).
 
 `docker/stage2-hook.sh` discovers the Chromium binary under
 `$PLAYWRIGHT_BROWSERS_PATH` at boot and exports `AGENT_BROWSER_EXECUTABLE_PATH`.
 
+Screenshots (`browser_vision`, `screenshot`) and WebM session recording both work
+headless — no display needed. `computer_use` (full desktop control / desktop screen
+recording) additionally needs Xvfb + a window manager, which this image does not ship.
+
 Verify after deployment:
 
 ```bash
-ssh -p 2223 hermes@<dokploy-host-or-domain> 'hermes doctor | grep -iA2 -E "playwright|browser tools"'
+ssh -p 2223 hermes@<dokploy-host-or-domain> \
+  'hermes doctor | grep -iA2 -E "playwright|browser tools"; hermes config get browser'
 ```
-
-Headless only — `computer_use` (full desktop control) additionally needs Xvfb + a
-window manager, which this image does not ship.
 
 ## Security Checks
 

@@ -19,11 +19,13 @@ services:
       - default
       - honcho-memory
     # Bootstrap defaults on every start (idempotent; config lives on the volume):
-    #  - memory.provider honcho  → use the sidecar Honcho service
-    #  - browser.backend off     → drive the baked full-Chromium via the built-in
-    #    browser_* tools instead of the Browser Use CLI, which would try to
-    #    fetch itself at runtime (see docs/deploy/dokploy-ssh.md).
-    command: ["sh", "-lc", "hermes config set memory.provider honcho >/dev/null 2>&1 || true; hermes config set browser.backend off >/dev/null 2>&1 || true; sleep infinity"]
+    #  - memory.provider honcho       → use the sidecar Honcho service
+    #  - browser.backend off          → drive the baked full-Chromium via the
+    #    built-in browser_* tools instead of the Browser Use CLI, which would
+    #    try to fetch itself at runtime (see docs/deploy/dokploy-ssh.md).
+    #  - browser.record_sessions true → auto-record each browser session to a
+    #    WebM under /opt/data/browser_recordings (screenshots always work).
+    command: ["sh", "-lc", "hermes config set memory.provider honcho >/dev/null 2>&1 || true; hermes config set browser.backend off >/dev/null 2>&1 || true; hermes config set browser.record_sessions true >/dev/null 2>&1 || true; sleep infinity"]
 
 volumes:
   hermes-data:
