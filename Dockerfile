@@ -196,11 +196,18 @@ COPY apps/shared/ apps/shared/
 # guards against a future regression if the source npm version changes.
 ENV npm_config_install_links=false
 
+# Full Chromium (not --only-shell): the sealed SSH-container deployment needs
+# a login-capable browser for the agent's browser_* tools, and the headless
+# shell alone doesn't satisfy agent-browser / doctor's "Playwright Chromium"
+# gate. agent-browser itself is baked here too (npm i -g) because the runtime
+# container can't reliably npx-fetch it on first use (AGENT_BROWSER_NPX_SPEC
+# in tools/browser_tool.py). See docs/deploy/dokploy-ssh.md.
 RUN npm install --prefer-offline --no-audit --fetch-retries=5 && \
     for i in 1 2 3; do \
-        npx playwright install --with-deps chromium --only-shell && break || \
+        npx playwright install --with-deps chromium && break || \
         { [ "$i" = 3 ] && exit 1; echo "playwright install failed (attempt $i); retrying in 10s"; sleep 10; }; \
     done && \
+    npm install -g agent-browser@^0.26.0 && \
     npm cache clean --force
 
 # ---------- Photon iMessage sidecar deps (baked, NS-606) ----------

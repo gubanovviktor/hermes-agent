@@ -103,6 +103,31 @@ deployment branch:
 Keep `HERMES_DASHBOARD_HOST=127.0.0.1` so the bind stays loopback-only (the non-loopback
 auth gate never engages); the SSH tunnel remains the security boundary.
 
+## Browser tools
+
+The agent's `browser_*` tools need a real Chromium. The published `--only-shell`
+Playwright install is not enough, and the sealed image cannot install a browser at
+runtime (`/opt/hermes` is read-only, `HERMES_DISABLE_LAZY_INSTALLS=1`). This branch
+bakes what's needed at build time:
+
+- `Dockerfile` — full `npx playwright install --with-deps chromium` (no `--only-shell`)
+  plus `npm install -g agent-browser@^0.26.0` so the CLI resolves offline.
+- `docker-compose.yml` `command:` — `hermes config set browser.backend off` on every
+  start, so Hermes drives the baked Chromium through the built-in `browser_*` tools
+  instead of the Browser Use CLI (which would try to fetch itself at runtime).
+
+`docker/stage2-hook.sh` discovers the Chromium binary under
+`$PLAYWRIGHT_BROWSERS_PATH` at boot and exports `AGENT_BROWSER_EXECUTABLE_PATH`.
+
+Verify after deployment:
+
+```bash
+ssh -p 2223 hermes@<dokploy-host-or-domain> 'hermes doctor | grep -iA2 -E "playwright|browser tools"'
+```
+
+Headless only — `computer_use` (full desktop control) additionally needs Xvfb + a
+window manager, which this image does not ship.
+
 ## Security Checks
 
 After deployment:
